@@ -34,6 +34,9 @@ INTERVALO_SEG     = float(os.getenv("NODE_INTERVAL_S", "5"))
 ENV_INTERVALO_SEG = float(os.getenv("ENV_INTERVAL_S", "10"))
 ACK_DELAY_S       = float(os.getenv("ACK_DELAY_S", "0.5"))
 
+# Nombre real del contenedor Docker de este agente (ej. sedcm-edge-agent-a1-n1)
+MY_CONTAINER_NAME = f"sedcm-edge-agent-{RACK_ID.lower()}-{NODO_ID.lower()}"
+
 TOPIC_NODO    = f"dc/telemetria/zona/{ZONA_ID}/rack/{RACK_ID}/nodo/{NODO_ID}"
 TOPIC_RACK    = f"dc/telemetria/zona/{ZONA_ID}/rack/{RACK_ID}/ambiente"
 TOPIC_CONTROL = f"dc/control/zona/{ZONA_ID}/rack/{RACK_ID}"
@@ -112,20 +115,29 @@ def _docker_start(container_name: str) -> str:
 
 # ── Ejecución de comandos — acceso directo a los objetos de emulación ─────────
 def _ejecutar_comando(client, payload):
-    command_id = payload.get("command_id", "ID_DESCONOCIDO")
-    action     = payload.get("action", "")
-    target     = payload.get("target") or {}
-    target_id  = target.get("target_id", f"sedcm-edge-agent-{ZONA_ID.lower()}{RACK_ID.lower()}")
-    mode       = payload.get("mode")
+    command_id  = payload.get("command_id", "ID_DESCONOCIDO")
+    action      = payload.get("action", "")
+    target      = payload.get("target") or {}
+    target_id   = target.get("target_id", NODO_ID)
+    target_type = target.get("target_type", "rack")
+    mode        = payload.get("mode")
 
     if not command_id or action not in ALLOWED_ACTIONS:
         print(f"[WARN] Comando inválido — command_id='{command_id}' action='{action}'")
         return
 
+    # Comandos dirigidos a un nodo específico: solo el nodo correcto los ejecuta.
+    # Varios agentes comparten el mismo tópico de control por rack; sin esta
+    # guardia, un hard_shutdown para N1 también silenciaría N2 (fan-out bug).
+    NODE_LEVEL_ACTIONS = {"soft_reboot", "hard_shutdown", "start_node"}
+    if action in NODE_LEVEL_ACTIONS and target_type == "nodo" and target_id != NODO_ID:
+        print(f"[IGNORADO] '{action}' para '{target_id}' — este nodo es '{NODO_ID}'")
+        return
+
     print(f"\n{'='*50}")
     print(f"[ALERTA] COMANDO RECIBIDO DEL BACKEND")
     print(f"  ID Orden : {command_id}")
-    print(f"  Objetivo : {target_id}")
+    print(f"  Objetivo : {target_id} (tipo: {target_type})")
     print(f"  Acción   : {action.upper()}")
     print(f"{'='*50}")
 
@@ -137,15 +149,15 @@ def _ejecutar_comando(client, payload):
         print(f"> soft_reboot aplicado — CPU/RAM de {NODO_ID} reseteados a estado base.")
 
     elif action == "hard_shutdown":
-        print(f"> [PELIGRO] Ejecutando hard_shutdown en '{target_id}'…")
-        ack_status = _docker_stop(target_id)
+        print(f"> [PELIGRO] Ejecutando hard_shutdown en '{MY_CONTAINER_NAME}'…")
+        ack_status = _docker_stop(MY_CONTAINER_NAME)
         # Silencia la telemetría del nodo; el ambiente sigue publicando (inercia térmica)
         _set_node_shutdown(True)
         print(f"> Nodo marcado como APAGADO — telemetría de nodo silenciada.")
 
     elif action == "start_node":
-        print(f"> Iniciando nodo '{target_id}'…")
-        ack_status = _docker_start(target_id)
+        print(f"> Iniciando nodo '{MY_CONTAINER_NAME}'…")
+        ack_status = _docker_start(MY_CONTAINER_NAME)
         if ack_status == "ACKED":
             # Despertar el nodo con métricas saludables — sin vuelta por MQTT
             nodo.soft_reboot()
