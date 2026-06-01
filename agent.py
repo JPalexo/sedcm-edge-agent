@@ -34,24 +34,12 @@ INTERVALO_SEG     = float(os.getenv("NODE_INTERVAL_S", "5"))
 ENV_INTERVALO_SEG = float(os.getenv("ENV_INTERVAL_S", "10"))
 ACK_DELAY_S       = float(os.getenv("ACK_DELAY_S", "0.5"))
 
-# Nombre real del contenedor Docker de este agente (ej. sedcm-edge-agent-a1-n1)
-MY_CONTAINER_NAME = f"sedcm-edge-agent-{RACK_ID.lower()}-{NODO_ID.lower()}"
-
 TOPIC_NODO    = f"dc/telemetria/zona/{ZONA_ID}/rack/{RACK_ID}/nodo/{NODO_ID}"
 TOPIC_RACK    = f"dc/telemetria/zona/{ZONA_ID}/rack/{RACK_ID}/ambiente"
 TOPIC_CONTROL = f"dc/control/zona/{ZONA_ID}/rack/{RACK_ID}"
 TOPIC_ACK     = f"dc/ack/zona/{ZONA_ID}/rack/{RACK_ID}"
 
 ALLOWED_ACTIONS = {"soft_reboot", "hard_shutdown", "set_hvac_mode", "start_node"}
-
-# ── Docker API (opcional) ─────────────────────────────────────────────────────
-try:
-    import docker as docker_sdk
-    _docker_client = docker_sdk.from_env()
-    print("[SISTEMA] API de Docker conectada correctamente.")
-except Exception as _e:
-    _docker_client = None
-    print(f"[WARN] Docker no disponible — hard_shutdown/start_node serán lógicos: {_e}")
 
 # ── Emuladores compartidos entre colección y ejecución ───────────────────────
 rng  = build_seeded_rng()
@@ -77,40 +65,6 @@ def _set_node_shutdown(value: bool):
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def _ts():
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _docker_stop(container_name: str) -> str:
-    if _docker_client is None:
-        print(f"> Docker no disponible — simulando apagado lógico de '{container_name}'.")
-        return "ACKED"
-    try:
-        c = _docker_client.containers.get(container_name)
-        c.stop()
-        print(f"> Éxito: contenedor '{container_name}' detenido.")
-        return "ACKED"
-    except Exception as exc:
-        if "NotFound" in type(exc).__name__:
-            print(f"[WARN] Contenedor '{container_name}' no encontrado — apagado lógico aplicado.")
-            return "ACKED"
-        print(f"[ERROR] Fallo al detener contenedor: {exc}")
-        return "FAILED"
-
-
-def _docker_start(container_name: str) -> str:
-    if _docker_client is None:
-        print(f"> Docker no disponible — simulando arranque lógico de '{container_name}'.")
-        return "ACKED"
-    try:
-        c = _docker_client.containers.get(container_name)
-        c.start()
-        print(f"> Éxito: contenedor '{container_name}' iniciado.")
-        return "ACKED"
-    except Exception as exc:
-        if "NotFound" in type(exc).__name__:
-            print(f"[WARN] Contenedor '{container_name}' no encontrado — arranque lógico aplicado.")
-            return "ACKED"
-        print(f"[ERROR] Fallo al iniciar contenedor: {exc}")
-        return "FAILED"
 
 
 # ── Ejecución de comandos — acceso directo a los objetos de emulación ─────────
@@ -149,20 +103,15 @@ def _ejecutar_comando(client, payload):
         print(f"> soft_reboot aplicado — CPU/RAM de {NODO_ID} reseteados a estado base.")
 
     elif action == "hard_shutdown":
-        print(f"> [PELIGRO] Ejecutando hard_shutdown en '{MY_CONTAINER_NAME}'…")
-        ack_status = _docker_stop(MY_CONTAINER_NAME)
-        # Silencia la telemetría del nodo; el ambiente sigue publicando (inercia térmica)
+        # Patrón BMC: apagado lógico únicamente — el proceso sigue vivo para escuchar start_node
         _set_node_shutdown(True)
-        print(f"> Nodo marcado como APAGADO — telemetría de nodo silenciada.")
+        print(f"> Nodo {NODO_ID} marcado como APAGADO — telemetría silenciada, listener MQTT activo.")
 
     elif action == "start_node":
-        print(f"> Iniciando nodo '{MY_CONTAINER_NAME}'…")
-        ack_status = _docker_start(MY_CONTAINER_NAME)
-        if ack_status == "ACKED":
-            # Despertar el nodo con métricas saludables — sin vuelta por MQTT
-            nodo.soft_reboot()
-            _set_node_shutdown(False)
-            print(f"> Nodo despertado — CPU/RAM reseteados a estado base, telemetría reanudada.")
+        # El contenedor ya está corriendo (patrón BMC) — solo despertar lógicamente
+        nodo.soft_reboot()
+        _set_node_shutdown(False)
+        print(f"> Nodo {NODO_ID} despertado — CPU/RAM reseteados a estado base, telemetría reanudada.")
 
     elif action == "set_hvac_mode":
         hvac_target = mode if mode in {"cooling", "humidify", "dehumidify"} else "cooling"
