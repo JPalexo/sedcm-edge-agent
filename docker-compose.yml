@@ -10,8 +10,8 @@ services:
       MQTT_PORT: ${MQTT_PORT:-1883}
       EDGE_ZONE: ${EDGE_ZONE:-B}
       EDGE_RACK: ${EDGE_ZONE:-B}1
-      NODE_ID: N1
-      EXECUTOR_ID: executor-${EDGE_ZONE:-B}1-N1
+      NODE_ID: ${EDGE_ZONE:-B}N1
+      EXECUTOR_ID: executor-${EDGE_ZONE:-B}1-${EDGE_ZONE:-B}N1
       NODE_INTERVAL_S: ${NODE_INTERVAL_S:-5}
       ENV_INTERVAL_S: ${ENV_INTERVAL_S:-10}
       ACK_DELAY_S: ${ACK_DELAY_S:-0.5}
@@ -29,8 +29,8 @@ services:
       MQTT_PORT: ${MQTT_PORT:-1883}
       EDGE_ZONE: ${EDGE_ZONE:-B}
       EDGE_RACK: ${EDGE_ZONE:-B}1
-      NODE_ID: N2
-      EXECUTOR_ID: executor-${EDGE_ZONE:-B}1-N2
+      NODE_ID: ${EDGE_ZONE:-B}N2
+      EXECUTOR_ID: executor-${EDGE_ZONE:-B}1-${EDGE_ZONE:-B}N2
       NODE_INTERVAL_S: ${NODE_INTERVAL_S:-5}
       ENV_INTERVAL_S: ${ENV_INTERVAL_S:-10}
       ACK_DELAY_S: ${ACK_DELAY_S:-0.5}
@@ -48,8 +48,8 @@ services:
       MQTT_PORT: ${MQTT_PORT:-1883}
       EDGE_ZONE: ${EDGE_ZONE:-B}
       EDGE_RACK: ${EDGE_ZONE:-B}2
-      NODE_ID: N3
-      EXECUTOR_ID: executor-${EDGE_ZONE:-B}2-N3
+      NODE_ID: ${EDGE_ZONE:-B}N3
+      EXECUTOR_ID: executor-${EDGE_ZONE:-B}2-${EDGE_ZONE:-B}N3
       NODE_INTERVAL_S: ${NODE_INTERVAL_S:-5}
       ENV_INTERVAL_S: ${ENV_INTERVAL_S:-10}
       ACK_DELAY_S: ${ACK_DELAY_S:-0.5}
@@ -67,8 +67,8 @@ services:
       MQTT_PORT: ${MQTT_PORT:-1883}
       EDGE_ZONE: ${EDGE_ZONE:-B}
       EDGE_RACK: ${EDGE_ZONE:-B}2
-      NODE_ID: N4
-      EXECUTOR_ID: executor-${EDGE_ZONE:-B}2-N4
+      NODE_ID: ${EDGE_ZONE:-B}N4
+      EXECUTOR_ID: executor-${EDGE_ZONE:-B}2-${EDGE_ZONE:-B}N4
       NODE_INTERVAL_S: ${NODE_INTERVAL_S:-5}
       ENV_INTERVAL_S: ${ENV_INTERVAL_S:-10}
       ACK_DELAY_S: ${ACK_DELAY_S:-0.5}
