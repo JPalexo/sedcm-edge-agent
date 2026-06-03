@@ -1,4 +1,7 @@
-# Variables de entorno con IP real del servidor (no subir al repo)
+# Configuración local con la IP real del servidor — NO subir al repo.
+# La plantilla pública es .env.example
+.env
+.env.local
 config.env
 
 # Python
